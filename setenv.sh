@@ -1,0 +1,11 @@
+export NODE_ENV=development
+export NODE_TLS_REJECT_UNAUTHORIZED=0
+export SERVICE_NAME='audit-api'
+export USE_HTTPS=false
+export AUDIT_PORT=3001
+export MONGODB_URL='mongodb://localhost:27017/audit'
+export AUDIT_API_KEY=1234abcd
+export LOG_LEVEL=debug
+export CONSOLELOG_ENABLED=true
+export FILELOG_ENABLED=false
+export MONGOLOG_ENABLED=true
