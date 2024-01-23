@@ -1,4 +1,4 @@
-# AUDIT-API
+# AUDIT-SRVC
 
 This is a sample and generic service to collect audit log information for safekeeping.
 
