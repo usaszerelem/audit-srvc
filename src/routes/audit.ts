@@ -6,6 +6,7 @@ import AuditDto, { AuditGetAllDto } from '../dtos/AuditDto';
 import hasApiKey from '../middleware/apiKey';
 import parseBool from '../utils/parseBool';
 import { AppEnv, Env } from '../utils/AppEnv';
+import { InvariantTimeStamp } from '../utils/InvariantTimeStamp';
 
 const router = express.Router();
 const logger = new AppLogger(module);
@@ -153,11 +154,19 @@ router.get('/', hasApiKey, async (req: Request, res: Response) => {
     const pageNumber: number = req.query.pageNumber ? +req.query.pageNumber : 1;
     const pageSize: number = req.query.pageSize ? +req.query.pageSize : 10;
     const sortBy = { timeStamp: 1 };
-    const filter = buildFilter(req);
 
     try {
+        const filter = buildFilter(req.query.startDate as string, req.query.endDate as string);
         const getFields = selectFields(req.body.select);
 
+        /*
+        {
+            timeStamp: {
+                $gte: new Date(new Date('2023-04-20').setUTCHours(8, 0, 0)),
+                $lte: new Date(new Date('2023-04-20').setUTCHours(8, 0, 0)),
+            },
+        }
+        */
         const events = (await Audit.find(filter)
             .skip((pageNumber - 1) * pageSize)
             .limit(pageSize)
@@ -169,34 +178,47 @@ router.get('/', hasApiKey, async (req: Request, res: Response) => {
         logger.info('Success');
         return res.status(200).json(response);
     } catch (ex) {
-        const msg = ErrorFormatter('Fatal error Audit GET', ex, __filename);
+        let msg = '';
+        let httpStatus = 500;
+
+        if (ex instanceof Error) {
+            msg = ex.message;
+            httpStatus = 400;
+        } else {
+            msg = ErrorFormatter('Fatal error Audit GET', ex, __filename);
+        }
+
         logger.error(msg);
-        return res.status(500).send(msg);
+        return res.status(httpStatus).send(msg);
     }
 });
 
 /**
  * Buils the database query filter so that documents in a date range are returned
- * @param req - GET query params
- * @returns JSON filter object to be used by database query
+ * @param startDate - Optional start date in ISO format. Example: "2023-04-20T00:00:00.000Z" or "2023-04-20T00:00:00"
+ * @param endDate - Optional end date in ISO format. Example: "2023-04-20T00:00:00.000Z" or "2023-04-20T00:00:00"
+ * @returns filter object to be used with .find()
  */
 
-function buildFilter(req: Request) {
+function buildFilter(startDate: string, endDate: string) {
     let filter = {};
 
-    if (req.query.startDate !== undefined) {
+    if (startDate !== undefined) {
         // "2023-04-20T00:00:00.000Z"
-        const startDate = new Date(req.query.startDate as string);
-        let endDate;
 
-        if (req.query.endDate === undefined) {
-            endDate = new Date();
-        } else {
-            endDate = new Date(req.query.endDate as string);
-        }
+        const startDt = new InvariantTimeStamp(startDate);
+        const endDt = new InvariantTimeStamp(endDate === undefined ? '2050-12-31T23:59:59' : endDate);
+
+        // Very important to note that the field to filter on is 'timeStamp' and not 'createdAt'.
+        // The date and time when the even was created might not be the same as when the database
+        // entry was created. As an example with delayed event notification in an occasionally
+        // connected environment.
 
         filter = {
-            timeStamp: { $gte: startDate, $lte: endDate },
+            timeStamp: {
+                $gte: new Date(new Date(startDt.getDatePortion()).setUTCHours(startDt.hours, startDt.minutes, startDt.seconds)),
+                $lte: new Date(new Date(endDt.getDatePortion()).setUTCHours(endDt.hours, endDt.minutes, endDt.seconds)),
+            },
         };
     }
 

@@ -1,3 +1,7 @@
+import path from 'path';
+
+require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
+
 export enum Env {
     SERVICE_NAME = 'SERVICE_NAME',
     USE_HTTPS = 'USE_HTTPS',
