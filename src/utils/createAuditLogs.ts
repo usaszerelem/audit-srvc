@@ -1,7 +1,7 @@
 import AuditDto from '../dtos/AuditDto';
 import { Audit } from '../models/audit';
-import { ErrorFormatter } from './ErrorFormatter';
 import AppLogger from './Logger';
+import { RouteErrorFormatter } from './RouteHandlingError';
 const logger = new AppLogger(module);
 
 export async function createAuditLogs(): Promise<void> {
@@ -46,7 +46,7 @@ export async function createAuditLogs(): Promise<void> {
             logger.info('Audit log created: ' + JSON.stringify(audit, null, 2));
         }
     } catch (ex) {
-        const msg = ErrorFormatter('Create Audit Logs Error', ex, __filename);
-        logger.error(msg);
+        const error = RouteErrorFormatter(ex, __filename, 'Create Audit Logs Error');
+        logger.error(error.message);
     }
 }

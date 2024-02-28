@@ -1,12 +1,12 @@
 import express, { Request, Response } from 'express';
 import AppLogger from '../utils/Logger';
-import { ErrorFormatter } from '../utils/ErrorFormatter';
 import { Audit, validateAudit } from '../models/audit';
 import AuditDto, { AuditGetAllDto } from '../dtos/AuditDto';
 import hasApiKey from '../middleware/apiKey';
 import parseBool from '../utils/parseBool';
 import { AppEnv, Env } from '../utils/AppEnv';
 import { InvariantTimeStamp } from '../utils/InvariantTimeStamp';
+import { RouteErrorFormatter, RouteHandlingError } from '../utils/RouteHandlingError';
 
 const router = express.Router();
 const logger = new AppLogger(module);
@@ -56,8 +56,7 @@ router.post('/', hasApiKey, async (req: Request, res: Response) => {
         const { error } = validateAudit(receivedAudit);
 
         if (error) {
-            logger.error(error.message);
-            return res.status(400).send(error.message);
+            throw new RouteHandlingError(400, error.message);
         }
 
         logger.info(JSON.stringify(receivedAudit, null, 2));
@@ -88,9 +87,9 @@ router.post('/', hasApiKey, async (req: Request, res: Response) => {
             return res.status(200).send('Success');
         }
     } catch (ex) {
-        const msg = ErrorFormatter('Fatal error Audit POST', ex, __filename);
-        logger.error(msg);
-        return res.status(500).send(msg);
+        const error = RouteErrorFormatter(ex, __filename, 'Fatal error Audit POST');
+        logger.error(error.message);
+        return res.status(error.httpStatus).send(error.message);
     }
 });
 
@@ -178,18 +177,9 @@ router.get('/', hasApiKey, async (req: Request, res: Response) => {
         logger.info('Success');
         return res.status(200).json(response);
     } catch (ex) {
-        let msg = '';
-        let httpStatus = 500;
-
-        if (ex instanceof Error) {
-            msg = ex.message;
-            httpStatus = 400;
-        } else {
-            msg = ErrorFormatter('Fatal error Audit GET', ex, __filename);
-        }
-
-        logger.error(msg);
-        return res.status(httpStatus).send(msg);
+        const error = RouteErrorFormatter(ex, __filename, 'Fatal error Audit GET');
+        logger.error(error.message);
+        return res.status(error.httpStatus).send(error.message);
     }
 });
 
@@ -203,23 +193,31 @@ router.get('/', hasApiKey, async (req: Request, res: Response) => {
 function buildFilter(startDate: string, endDate: string) {
     let filter = {};
 
-    if (startDate !== undefined) {
-        // "2023-04-20T00:00:00.000Z"
+    try {
+        if (startDate !== undefined) {
+            // "2023-04-20T00:00:00.000Z"
 
-        const startDt = new InvariantTimeStamp(startDate);
-        const endDt = new InvariantTimeStamp(endDate === undefined ? '2050-12-31T23:59:59' : endDate);
+            const startDt = new InvariantTimeStamp(startDate);
+            const endDt = new InvariantTimeStamp(endDate === undefined ? '2050-12-31T23:59:59' : endDate);
 
-        // Very important to note that the field to filter on is 'timeStamp' and not 'createdAt'.
-        // The date and time when the even was created might not be the same as when the database
-        // entry was created. As an example with delayed event notification in an occasionally
-        // connected environment.
+            // Very important to note that the field to filter on is 'timeStamp' and not 'createdAt'.
+            // The date and time when the even was created might not be the same as when the database
+            // entry was created. As an example with delayed event notification in an occasionally
+            // connected environment.
 
-        filter = {
-            timeStamp: {
-                $gte: new Date(new Date(startDt.getDatePortion()).setUTCHours(startDt.hours, startDt.minutes, startDt.seconds)),
-                $lte: new Date(new Date(endDt.getDatePortion()).setUTCHours(endDt.hours, endDt.minutes, endDt.seconds)),
-            },
-        };
+            filter = {
+                timeStamp: {
+                    $gte: new Date(new Date(startDt.getDatePortion()).setUTCHours(startDt.hours, startDt.minutes, startDt.seconds)),
+                    $lte: new Date(new Date(endDt.getDatePortion()).setUTCHours(endDt.hours, endDt.minutes, endDt.seconds)),
+                },
+            };
+        }
+    } catch (ex) {
+        if (ex instanceof Error) {
+            throw new RouteHandlingError(400, ex.message);
+        } else {
+            throw ex;
+        }
     }
 
     return filter;

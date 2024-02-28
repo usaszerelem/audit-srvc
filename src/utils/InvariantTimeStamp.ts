@@ -145,7 +145,7 @@ export class InvariantTimeStamp {
 
     private set hours(theHour: number) {
         if (theHour < 0 || theHour > 23) {
-            throw new Error(`Hour should be between 1 and 23`);
+            throw new Error(`Hour should be between 0 and 23`);
         }
 
         this._hour = theHour;
@@ -156,7 +156,7 @@ export class InvariantTimeStamp {
 
     private set minutes(theMinute: number) {
         if (theMinute < 0 || theMinute > 59) {
-            throw new Error(`Minute should be between 1 and 59`);
+            throw new Error(`Minute should be between 0 and 59`);
         }
 
         this._minute = theMinute;
@@ -167,7 +167,7 @@ export class InvariantTimeStamp {
 
     private set seconds(theSecond: number) {
         if (theSecond < 0 || theSecond > 59) {
-            throw new Error(`Second should be between 1 and 59`);
+            throw new Error(`Second should be between 0 and 59`);
         }
 
         this._second = theSecond;
